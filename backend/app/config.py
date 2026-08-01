@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     PINECONE_API_KEY: str
     PINECONE_INDEX: str
     GOOGLE_API_KEY: str
+    HUGGINGFACE_API_KEY: str
 
     class Config:
         env_file = ".env"

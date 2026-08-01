@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, Bot, User, Loader2, Copy, Check, Info, Mic, MicOff, Volume2, VolumeX, Share } from "lucide-react";
+import { Send, Bot, User, Loader2, Copy, Check, Info, Mic, MicOff, Volume2, VolumeX, Share, Globe, MessageCircle, Mail, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -59,7 +58,15 @@ export function ChatUI({ isNewSession = true, initialSessionId }: ChatUIProps) {
     
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
-      setInput((prev) => prev + (prev ? " " : "") + transcript);
+      setInput(transcript);
+      // Automatically send the message after a short delay so the state updates
+      setTimeout(() => {
+        const formEvent = { preventDefault: () => {} } as React.FormEvent;
+        const submitBtn = document.getElementById('chat-submit-btn');
+        if (submitBtn) {
+           submitBtn.click();
+        }
+      }, 100);
     };
 
     recognition.onerror = (event: any) => {
@@ -116,15 +123,15 @@ export function ChatUI({ isNewSession = true, initialSessionId }: ChatUIProps) {
     
     setIsSharing(true);
     try {
-      const res = await fetch("/api/chat/share", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
-      
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to share chat");
+      // Best-effort attempt to mark the session as shared in the backend
+      try {
+        await fetch("/api/chat/share", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+      } catch (err) {
+        console.warn("Could not mark session as shared in backend:", err);
       }
       
       const shareUrl = `${window.location.origin}/share/${sessionId}`;
@@ -259,7 +266,7 @@ export function ChatUI({ isNewSession = true, initialSessionId }: ChatUIProps) {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <div className="flex-1 p-4 overflow-y-auto" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-4 pt-20">
             <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center">
@@ -297,28 +304,6 @@ export function ChatUI({ isNewSession = true, initialSessionId }: ChatUIProps) {
                       : "bg-muted rounded-tl-sm border"
                   )}
                 >
-                  {message.role === "assistant" && (
-                    <div className="absolute -right-[4.5rem] top-0 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground"
-                        onClick={() => copyToClipboard(message.content, message.id)}
-                        title="Copy to clipboard"
-                      >
-                        {copiedId === message.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn("h-8 w-8 text-muted-foreground", speakingId === message.id && "text-primary bg-primary/10")}
-                        onClick={() => toggleSpeak(message.content, message.id)}
-                        title={speakingId === message.id ? "Stop speaking" : "Read aloud"}
-                      >
-                        {speakingId === message.id ? <VolumeX className="h-4 w-4 animate-pulse" /> : <Volume2 className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  )}
                   <div className={cn(
                     "prose prose-sm dark:prose-invert max-w-none break-words",
                     message.role === "user" && "text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground"
@@ -327,6 +312,31 @@ export function ChatUI({ isNewSession = true, initialSessionId }: ChatUIProps) {
                       {message.content}
                     </ReactMarkdown>
                   </div>
+
+                  {message.role === "assistant" && (
+                    <div className="mt-3 flex items-center space-x-1 border-t pt-2 opacity-70 hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-muted-foreground"
+                        onClick={() => copyToClipboard(message.content, message.id)}
+                        title="Copy to clipboard"
+                      >
+                        {copiedId === message.id ? <Check className="h-3.5 w-3.5 mr-1" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                        {copiedId === message.id ? "Copied" : "Copy"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn("h-7 px-2 text-xs text-muted-foreground", speakingId === message.id && "text-primary bg-primary/10")}
+                        onClick={() => toggleSpeak(message.content, message.id)}
+                        title={speakingId === message.id ? "Stop speaking" : "Read aloud"}
+                      >
+                        {speakingId === message.id ? <VolumeX className="h-3.5 w-3.5 mr-1 animate-pulse" /> : <Volume2 className="h-3.5 w-3.5 mr-1" />}
+                        {speakingId === message.id ? "Stop" : "Read Aloud"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -344,7 +354,7 @@ export function ChatUI({ isNewSession = true, initialSessionId }: ChatUIProps) {
             )}
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       {/* Input */}
       <div className="p-4 bg-background border-t">
@@ -370,6 +380,7 @@ export function ChatUI({ isNewSession = true, initialSessionId }: ChatUIProps) {
               {isListening ? <MicOff className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
             </Button>
             <Button
+              id="chat-submit-btn"
               type="submit"
               size="icon"
               disabled={isLoading || !input.trim()}

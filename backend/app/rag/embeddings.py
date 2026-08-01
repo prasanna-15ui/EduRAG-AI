@@ -1,15 +1,31 @@
 from sentence_transformers import SentenceTransformer
-import os
+import traceback
 
-# Initialize the model (downloads it locally on first run)
-# 'all-MiniLM-L6-v2' maps to 384 dimensions, which should match your Pinecone index.
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# Lazy load the model to prevent Uvicorn deadlocks on Windows during reload
+_model = None
+
+def get_model():
+    global _model
+    if _model is None:
+        print("Loading local SentenceTransformer model...")
+        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        print("Model loaded successfully!")
+    return _model
 
 def get_embedding(text: str) -> list[float]:
-    # Returns a list of floats
-    embedding = model.encode(text)
-    return embedding.tolist()
+    try:
+        embedding = get_model().encode(text)
+        return embedding.tolist()
+    except Exception as e:
+        print(f"Embedding error: {e}")
+        traceback.print_exc()
+        raise
 
 def get_embeddings(texts: list[str]) -> list[list[float]]:
-    embeddings = model.encode(texts)
-    return embeddings.tolist()
+    try:
+        embeddings = get_model().encode(texts)
+        return [e.tolist() for e in embeddings]
+    except Exception as e:
+        print(f"Embeddings error: {e}")
+        traceback.print_exc()
+        raise
