@@ -57,13 +57,14 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
           data: {
             full_name: values.fullName,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -72,10 +73,16 @@ export default function SignupPage() {
         return;
       }
 
-      toast.success("Account created successfully!");
-
-      router.push("/dashboard");
-      router.refresh();
+      if (data?.session === null) {
+        toast.success("Account created! Please check your email for a verification link to log in.", {
+          duration: 6000,
+        });
+        router.push("/login");
+      } else {
+        toast.success("Account created successfully!");
+        router.push("/dashboard");
+        router.refresh();
+      }
     } catch (error) {
       toast.error("An unexpected error occurred.");
     } finally {

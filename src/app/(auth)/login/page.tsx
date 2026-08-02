@@ -47,7 +47,31 @@ export default function LoginPage() {
       });
 
       if (error) {
-        toast.error(error.message);
+        if (error.message.includes("Email not confirmed")) {
+          toast.error("Email not verified.", {
+            description: "Please check your email for the verification link.",
+            action: {
+              label: "Resend Email",
+              onClick: async () => {
+                const { error: resendError } = await supabase.auth.resend({
+                  type: 'signup',
+                  email: values.email,
+                  options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                  }
+                });
+                if (resendError) {
+                  toast.error(resendError.message);
+                } else {
+                  toast.success("Verification email resent! Please check your inbox.");
+                }
+              },
+            },
+            duration: 10000,
+          });
+        } else {
+          toast.error(error.message);
+        }
         return;
       }
 
